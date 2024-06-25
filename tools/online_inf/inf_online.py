@@ -7,7 +7,10 @@ from PIL import Image, ImageDraw, ImageFont, ImageEnhance
 from mmseg.apis import init_model, inference_model
 import numpy as np
 import cv2
-import json
+import json, uuid
+from oss_utils import OssUpload
+from concurrent.futures import ThreadPoolExecutor
+
 
 
 classes = ('Bird', 'Ground Animal', 'Curb', 'Fence', 'Guard Rail', 'Barrier',
@@ -42,18 +45,6 @@ palette = [[165, 42, 42], [0, 192, 0], [196, 196, 196], [190, 153, 153],
            [0, 0, 70], [0, 0, 192], [32, 32, 32], [120, 10, 10]]
 
 
-import os
-import glob
-import logging
-import torch
-from tqdm import tqdm
-from PIL import Image, ImageDraw, ImageFont, ImageEnhance
-from mmseg.apis import init_model, inference_model
-import numpy as np
-import cv2
-import json
-from concurrent.futures import ThreadPoolExecutor
-
 # 配置日志记录
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(message)s')
 logger = logging.getLogger()
@@ -61,9 +52,9 @@ logger = logging.getLogger()
 config_path = 'configs/dinov2/dinov2_vitg_mask2former_240k_mapillary_v2-672x672.py'
 checkpoint_path = '/share/tengjianing/songyuhao/segmentation/models/0609_data_mapillary_18000/best_mIoU_iter_30000.pth'
 
-id = "5k"
-img_dir = "/mnt/ve_share/songyuhao/dm_test.hds"
-out_dir = "/mnt/ve_share/wangdaming/vis/syh_test"
+img_dir = "/mnt/ve_share/songyuhao/dm_test.txt"
+out_dir = "/cpfs/temp_img"
+os.makedirs(out_dir, exist_ok=True)
 
 add_labels = True  # 控制是否添加类别标签
 batch_size = 10  # 定义批处理大小
@@ -75,34 +66,31 @@ def list_image_files_in_directory(directory):
     return jpg_files + png_files + jpeg_files
 
 def load_image_list(img_dir):
-    if img_dir.endswith(".txt"):
-        with open(img_dir) as input_f:
-            return [_.strip() for _ in input_f.readlines()]
-    elif img_dir.endswith(".hds"):
-        img_list = []
-        with open(img_dir) as input_f:
-            json_list = [_.strip() for _ in input_f.readlines()]
-        for j in json_list:
-            j = j if j.startswith("/") else "/" + j
-            with open(j.strip(), 'r') as f:
-                json_info = json.load(f)
-            img_info = json_info['camera']
-            for view in img_info:
-                if view['name'] == 'front_long_camera_record':
-                    path = view['oss_path']
-                    path = path if path.startswith("/") else "/" + path
-                    img_list.append(path)
-                    break
-        return img_list
-    else:
-        return list_image_files_in_directory(img_dir)
+    with open(img_dir) as input_txt:
+        input_hds = [_.strip() for _ in input_txt.readlines()][0]
+    input_hds = input_hds if input_hds.startswith("/") else "/" + input_hds
+    with open(input_hds) as input_f:
+        json_list = [_.strip() for _ in input_f.readlines()]
+    img_list = []
+    for j in json_list:
+        j = j if j.startswith("/") else "/" + j
+        with open(j.strip(), 'r') as f:
+            json_info = json.load(f)
+        img_info = json_info['camera']
+        for view in img_info:
+            if view['name'] == 'front_long_camera_record':
+                path = view['oss_path']
+                path = path if path.startswith("/") else "/" + path
+                img_list.append((path, j.strip()))  # 返回路径和原始JSON文件路径
+                break
+    return img_list
 
 img_list = load_image_list(img_dir)
 print(len(img_list))
 
 # 初始化模型并加载检查点
 logger.info('Initializing model...')
-model = init_model(config_path, checkpoint_path, device='cuda:2')
+model = init_model(config_path, checkpoint_path, device='cuda:0')
 logger.info('Model initialized successfully.')
 
 category_colors = {i: tuple(color) for i, color in enumerate(palette)}
@@ -118,7 +106,7 @@ def is_position_valid(avg_x, avg_y, text_size, existing_labels, buffer=10):
     return True
 
 def tensor_to_image(tensor, color_dict, classes, original_img, alpha=0.8, add_labels=True):
-    tensor = tensor.squeeze(0).cpu().numpy()
+    tensor = tensor.squeeze(0).to('cuda')
     h, w = tensor.shape
     overlay = Image.new('RGBA', (w, h))
 
@@ -130,7 +118,7 @@ def tensor_to_image(tensor, color_dict, classes, original_img, alpha=0.8, add_la
     draw = ImageDraw.Draw(overlay)
     font = ImageFont.truetype("/root/mmsegmentation/data/Arial.ttf", font_size)
 
-    tensor_flat = tensor.flatten()
+    tensor_flat = tensor.flatten().cpu().numpy()
     unique_categories = np.unique(tensor_flat)
     color_array = np.zeros((tensor_flat.size, 4), dtype=np.uint8)
 
@@ -144,7 +132,7 @@ def tensor_to_image(tensor, color_dict, classes, original_img, alpha=0.8, add_la
 
     label_positions = {}
     for category in unique_categories:
-        positions = np.column_stack(np.where(tensor == category))
+        positions = np.column_stack(np.where(tensor.cpu().numpy() == category))
         label_positions[category] = positions.tolist()
 
     existing_labels = []
@@ -210,20 +198,54 @@ def load_image(img_path):
     return img_path, Image.open(img_path).convert('RGB')
 
 def process_batch(batch):
-    results = inference_model(model, batch)
+    results = inference_model(model, [img[0] for img in batch])
     with ThreadPoolExecutor() as executor:
-        images = list(executor.map(load_image, batch))
-    for (img_path, original_img), result in zip(images, results):
+        images = list(executor.map(load_image, [img[0] for img in batch]))
+    for (img_path, original_img), result, json_path in zip(images, results, [img[1] for img in batch]):
         out_path = os.path.join(out_dir, "_".join(img_path.split("/")[-2:]).replace(".jpg", ".png"))
         os.makedirs(out_dir, exist_ok=True)
         tensor_img = result.pred_sem_seg.data[0]
         img_result = tensor_to_image(tensor_img, category_colors, classes, original_img, alpha=1.0, add_labels=False)
         img_result.save(out_path)
-        logger.info(f'Processed and saved result for image: {out_path}')
+        oss_path = upload_img(out_path)
+        logger.info(f'Processed and saved result for image: {oss_path}')
+        
+        # 更新JSON文件
+        with open(json_path, 'r') as f:
+            json_data = json.load(f)
+        img_info = json_data['camera']
+        for view in img_info:
+            if view['name'] == 'front_long_camera_record':
+                view['semantic_oss_path'] = oss_path
+                break
+        output_json_path = os.path.join('/cpfs/output/card', os.path.basename(json_path))
+        os.makedirs(os.path.dirname(output_json_path), exist_ok=True)
+        with open(output_json_path, 'w') as f:
+            json.dump(json_data, f, indent=4)
 
 def chunk_list(lst, n):
     for i in range(0, len(lst), n):
         yield lst[i:i + n]
+        
+def upload_img(input_path):
+    img_oss_path = ""
+    png_name = input_path.split("/")[-1]
+    img_oss_path = gen_path(1, png_name)
+
+    # 上传image
+    # os = OssUpload()
+    ins = OssUpload.relative_path(img_oss_path)
+    is_ok = ins.put_object_from_file(input_path)
+
+    return img_oss_path
+
+
+def gen_path(clip_id, video_name):
+    print("video_name is %s" % video_name)
+    prefix = "tos://haomo-public/lucas-generation/online_services/segementation"  #拼接tos桶路径  自己定  应该是放到public
+    guid = str(uuid.uuid4())
+    return f"{prefix}/{clip_id}/{guid}/{video_name}"
+
 
 if __name__ == '__main__':
     batches = list(chunk_list(img_list, batch_size))
