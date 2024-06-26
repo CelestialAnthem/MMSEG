@@ -21,7 +21,7 @@ model = dict(
         type='DINOv2',
         version='giant',
         freeze=False,
-        load_from='./checkpoints/dinov2_vitg14_pretrain.pth'),
+        load_from='/share/chenminghua/model_segmentation/checkpoints/dinov2_vitg14_pretrain.pth'),
     neck=dict(type='Feature2Pyramid', embed_dim=1536, rescales=[4, 2, 1, 0.5]),
     decode_head=dict(
         type='Mask2FormerHead',

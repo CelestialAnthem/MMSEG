@@ -1,6 +1,8 @@
 # dataset settings
 dataset_type = 'MapillaryDataset_v1'
 data_root = 'data/mapillary/'
+train_path = "xx/train.json"
+val_path = "xx/val.json"
 crop_size = (512, 1024)
 train_pipeline = [
     dict(type='LoadImageFromFile'),
@@ -47,8 +49,9 @@ train_dataloader = dict(
     dataset=dict(
         type=dataset_type,
         data_root=data_root,
+        anno_json_path=train_path,
         data_prefix=dict(
-            img_path='training/images', seg_map_path='training/v1.2/labels'),
+            img_path='training/images', seg_map_path='training/labels'),
         pipeline=train_pipeline))
 val_dataloader = dict(
     batch_size=1,
@@ -58,9 +61,10 @@ val_dataloader = dict(
     dataset=dict(
         type=dataset_type,
         data_root=data_root,
+        anno_json_path=val_path,
         data_prefix=dict(
             img_path='validation/images',
-            seg_map_path='validation/v1.2/labels'),
+            seg_map_path='validation/labels'),
         pipeline=test_pipeline))
 test_dataloader = val_dataloader
 

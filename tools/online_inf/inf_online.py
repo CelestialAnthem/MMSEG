@@ -50,7 +50,7 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(message)s')
 logger = logging.getLogger()
 
 config_path = 'configs/dinov2/dinov2_vitg_mask2former_240k_mapillary_v2-672x672.py'
-checkpoint_path = '/share/tengjianing/songyuhao/segmentation/models/0609_data_mapillary_18000/best_mIoU_iter_30000.pth'
+checkpoint_path = '/root/models/seg_0626.pth'
 
 img_dir = "/mnt/ve_share/songyuhao/dm_test.txt"
 out_dir = "/cpfs/temp_img"

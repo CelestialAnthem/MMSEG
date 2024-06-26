@@ -1,10 +1,10 @@
 # Copyright (c) OpenMMLab. All rights reserved.
 from mmseg.registry import DATASETS
-from .basesegdataset import BaseSegDataset
+from .basesegdataset import BaseSegDataset, BaseHaomoDataset
 
 
 @DATASETS.register_module()
-class MapillaryDataset_v1(BaseSegDataset):
+class MapillaryDataset_v1(BaseHaomoDataset):
     """Mapillary Vistas Dataset.
 
     Dataset paper link:
