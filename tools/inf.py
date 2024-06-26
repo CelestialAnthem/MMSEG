@@ -8,6 +8,7 @@ from mmseg.apis import init_model, inference_model
 import numpy as np
 import cv2
 import json
+from concurrent.futures import ThreadPoolExecutor
 
 
 classes = ('Bird', 'Ground Animal', 'Curb', 'Fence', 'Guard Rail', 'Barrier',
@@ -42,31 +43,19 @@ palette = [[165, 42, 42], [0, 192, 0], [196, 196, 196], [190, 153, 153],
            [0, 0, 70], [0, 0, 192], [32, 32, 32], [120, 10, 10]]
 
 
-import os
-import glob
-import logging
-import torch
-from tqdm import tqdm
-from PIL import Image, ImageDraw, ImageFont, ImageEnhance
-from mmseg.apis import init_model, inference_model
-import numpy as np
-import cv2
-import json
-from concurrent.futures import ThreadPoolExecutor
-
-# 配置日志记录
+# Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(message)s')
 logger = logging.getLogger()
 
 config_path = 'configs/dinov2/dinov2_vitg_mask2former_240k_mapillary_v2-672x672.py'
 checkpoint_path = '/share/tengjianing/songyuhao/segmentation/models/0609_data_mapillary_18000/best_mIoU_iter_30000.pth'
 
-id = "5k"
-img_dir = "/mnt/ve_share/songyuhao/dm_test.hds"
-out_dir = "/mnt/ve_share/wangdaming/vis/syh_test"
+img_dir = "/root/test_images"
+out_dir = "/root/test_out"
+alpha = 0.8
 
 add_labels = True  # 控制是否添加类别标签
-batch_size = 10  # 定义批处理大小
+batch_size = 1  # 定义批处理大小
 
 def list_image_files_in_directory(directory):
     jpg_files = glob.glob(os.path.join(directory, '**', '*.jpg'), recursive=True)
@@ -118,19 +107,17 @@ def is_position_valid(avg_x, avg_y, text_size, existing_labels, buffer=10):
     return True
 
 def tensor_to_image(tensor, color_dict, classes, original_img, alpha=0.8, add_labels=True):
-    tensor = tensor.squeeze(0).cpu().numpy()
+    tensor = tensor.squeeze(0).to('cuda')
     h, w = tensor.shape
-    overlay = Image.new('RGBA', (w, h))
 
     scale_factor = h / 2160
     font_size = int(48 * scale_factor)
     distance_threshold = 1500 * scale_factor
     move_distance = int(100 * scale_factor)
 
-    draw = ImageDraw.Draw(overlay)
     font = ImageFont.truetype("/root/mmsegmentation/data/Arial.ttf", font_size)
 
-    tensor_flat = tensor.flatten()
+    tensor_flat = tensor.flatten().cpu().numpy()
     unique_categories = np.unique(tensor_flat)
     color_array = np.zeros((tensor_flat.size, 4), dtype=np.uint8)
 
@@ -141,10 +128,12 @@ def tensor_to_image(tensor, color_dict, classes, original_img, alpha=0.8, add_la
 
     color_array = color_array.reshape(h, w, 4)
     overlay = Image.fromarray(color_array, 'RGBA')
+    draw = ImageDraw.Draw(overlay)
+    
 
     label_positions = {}
     for category in unique_categories:
-        positions = np.column_stack(np.where(tensor == category))
+        positions = np.column_stack(np.where(tensor.cpu().numpy() == category))
         label_positions[category] = positions.tolist()
 
     existing_labels = []
@@ -153,6 +142,7 @@ def tensor_to_image(tensor, color_dict, classes, original_img, alpha=0.8, add_la
         for category, positions in label_positions.items():
             if category < len(classes):
                 mask = np.zeros((h, w), dtype=np.uint8)
+                positions = np.array(positions)  # Convert to NumPy array
                 mask[positions[:, 0], positions[:, 1]] = 255
                 num_labels, labels_im = cv2.connectedComponents(mask)
 
@@ -217,7 +207,7 @@ def process_batch(batch):
         out_path = os.path.join(out_dir, "_".join(img_path.split("/")[-2:]).replace(".jpg", ".png"))
         os.makedirs(out_dir, exist_ok=True)
         tensor_img = result.pred_sem_seg.data[0]
-        img_result = tensor_to_image(tensor_img, category_colors, classes, original_img, alpha=1.0, add_labels=False)
+        img_result = tensor_to_image(tensor_img, category_colors, classes, original_img, alpha=alpha, add_labels=add_labels)
         img_result.save(out_path)
         logger.info(f'Processed and saved result for image: {out_path}')
 

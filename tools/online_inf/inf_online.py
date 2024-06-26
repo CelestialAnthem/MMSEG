@@ -58,8 +58,8 @@ output_json_dir = '/cpfs/output/hds/semantic'
 os.makedirs(out_dir, exist_ok=True)
 os.makedirs(output_json_dir, exist_ok=True)
 
-add_labels = True 
-batch_size = 10
+add_labels = False 
+batch_size = 2
 
 def list_image_files_in_directory(directory):
     jpg_files = glob.glob(os.path.join(directory, '**', '*.jpg'), recursive=True)
@@ -110,14 +110,12 @@ def is_position_valid(avg_x, avg_y, text_size, existing_labels, buffer=10):
 def tensor_to_image(tensor, color_dict, classes, original_img, alpha=0.8, add_labels=True):
     tensor = tensor.squeeze(0).to('cuda')
     h, w = tensor.shape
-    overlay = Image.new('RGBA', (w, h))
 
     scale_factor = h / 2160
     font_size = int(48 * scale_factor)
     distance_threshold = 1500 * scale_factor
     move_distance = int(100 * scale_factor)
 
-    draw = ImageDraw.Draw(overlay)
     font = ImageFont.truetype("/root/mmsegmentation/data/Arial.ttf", font_size)
 
     tensor_flat = tensor.flatten().cpu().numpy()
@@ -131,6 +129,8 @@ def tensor_to_image(tensor, color_dict, classes, original_img, alpha=0.8, add_la
 
     color_array = color_array.reshape(h, w, 4)
     overlay = Image.fromarray(color_array, 'RGBA')
+    draw = ImageDraw.Draw(overlay)
+    
 
     label_positions = {}
     for category in unique_categories:
