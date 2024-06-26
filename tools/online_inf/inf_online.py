@@ -52,7 +52,7 @@ config_path = 'configs/dinov2/dinov2_vitg_mask2former_240k_mapillary_v2-672x672.
 checkpoint_path = '/root/models/seg_0626.pth'
 
 
-img_dir = "/mnt/ve_share/songyuhao/dm_test.txt"
+img_dir = "/data_path/test.txt"
 out_dir = "/cpfs/temp_img"
 output_json_dir = '/cpfs/output/hds/segmentation'
 os.makedirs(out_dir, exist_ok=True)
