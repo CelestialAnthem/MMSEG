@@ -54,7 +54,7 @@ checkpoint_path = '/root/models/seg_0626.pth'
 
 img_dir = "/data_path/test.txt"
 out_dir = "/cpfs/temp_img"
-output_json_dir = '/cpfs/output/hds/segmentation'
+output_json_dir = '/cpfs/output/hds/semantic'
 os.makedirs(out_dir, exist_ok=True)
 os.makedirs(output_json_dir, exist_ok=True)
 
