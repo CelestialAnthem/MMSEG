@@ -45,19 +45,21 @@ palette = [[165, 42, 42], [0, 192, 0], [196, 196, 196], [190, 153, 153],
            [0, 0, 70], [0, 0, 192], [32, 32, 32], [120, 10, 10]]
 
 
-# 配置日志记录
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(message)s')
 logger = logging.getLogger()
 
 config_path = 'configs/dinov2/dinov2_vitg_mask2former_240k_mapillary_v2-672x672.py'
 checkpoint_path = '/root/models/seg_0626.pth'
 
+
 img_dir = "/mnt/ve_share/songyuhao/dm_test.txt"
 out_dir = "/cpfs/temp_img"
+output_json_dir = '/cpfs/output/hds/segmentation'
 os.makedirs(out_dir, exist_ok=True)
+os.makedirs(output_json_dir, exist_ok=True)
 
-add_labels = True  # 控制是否添加类别标签
-batch_size = 10  # 定义批处理大小
+add_labels = True 
+batch_size = 10
 
 def list_image_files_in_directory(directory):
     jpg_files = glob.glob(os.path.join(directory, '**', '*.jpg'), recursive=True)
@@ -88,7 +90,7 @@ def load_image_list(img_dir):
 img_list = load_image_list(img_dir)
 print(len(img_list))
 
-# 初始化模型并加载检查点
+
 logger.info('Initializing model...')
 model = init_model(config_path, checkpoint_path, device='cuda:0')
 logger.info('Model initialized successfully.')
@@ -218,7 +220,7 @@ def process_batch(batch):
             if view['name'] == 'front_long_camera_record':
                 view['semantic_oss_path'] = oss_path
                 break
-        output_json_path = os.path.join('/cpfs/output/card', os.path.basename(json_path))
+        output_json_path = os.path.join(output_json_dir, os.path.basename(json_path))
         os.makedirs(os.path.dirname(output_json_path), exist_ok=True)
         with open(output_json_path, 'w') as f:
             json.dump(json_data, f, indent=4)
