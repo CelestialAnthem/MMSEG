@@ -48,7 +48,7 @@ palette = [[165, 42, 42], [0, 192, 0], [196, 196, 196], [190, 153, 153],
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(message)s')
 logger = logging.getLogger()
 
-config_path = 'configs/dinov2/dinov2_vitg_mask2former_240k_mapillary_v2-672x672.py'
+config_path = '/root/mmsegmentation/configs/dinov2/dinov2_vitg_mask2former_240k_mapillary_v2-672x672_online.py'
 checkpoint_path = '/root/models/seg_0626.pth'
 
 
