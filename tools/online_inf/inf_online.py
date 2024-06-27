@@ -68,10 +68,10 @@ def list_image_files_in_directory(directory):
     return jpg_files + png_files + jpeg_files
 
 def load_image_list(img_dir):
-    with open(img_dir) as input_txt:
-        input_hds = [_.strip() for _ in input_txt.readlines()][0]
-    input_hds = input_hds if input_hds.startswith("/") else "/" + input_hds
-    with open(input_hds) as input_f:
+    # with open(img_dir) as input_txt:
+    #     input_hds = [_.strip() for _ in input_txt.readlines()][0]
+    # input_hds = input_hds if input_hds.startswith("/") else "/" + input_hds
+    with open(img_dir) as input_f:
         json_list = [_.strip() for _ in input_f.readlines()]
     img_list = []
     for j in json_list:
