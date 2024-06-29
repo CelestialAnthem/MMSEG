@@ -79,12 +79,13 @@ def load_image_list(img_dir):
         with open(j.strip(), 'r') as f:
             json_info = json.load(f)
         img_info = json_info['camera']
+        paths = []
         for view in img_info:
             if view['name'] == 'front_long_camera_record':
                 path = view['oss_path']
                 path = path if path.startswith("/") else "/" + path
-                img_list.append((path, j.strip()))  # 返回路径和原始JSON文件路径
-                break
+                paths.append(path)
+        img_list.append((paths[-1], j.strip()))
     return img_list
 
 img_list = load_image_list(img_dir)
@@ -216,10 +217,11 @@ def process_batch(batch):
         with open(json_path, 'r') as f:
             json_data = json.load(f)
         img_info = json_data['camera']
+        views = []
         for view in img_info:
             if view['name'] == 'front_long_camera_record':
-                view['semantic_oss_path'] = oss_path
-                break
+                views.append(view)
+        views[-1]['semantic_oss_path'] = oss_path
         output_json_path = os.path.join(output_json_dir, os.path.basename(json_path))
         os.makedirs(os.path.dirname(output_json_path), exist_ok=True)
         with open(output_json_path, 'w') as f:

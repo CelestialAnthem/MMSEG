@@ -1,8 +1,11 @@
 import os
 import glob
 import json
+import matplotlib.pyplot as plt
+import numpy as np
 
-s = 60000
+
+s = 0
 t = 80000
 def get_all_json_files(root_dir):
     # 使用glob模块递归搜索所有的json文件
@@ -57,8 +60,20 @@ jsonl_data = load_jsonl(jsonl_file_path)
 # 匹配top20000数据与jsonl数据
 matched_data = match_top_data_with_jsonl(top_20000_data, jsonl_data)
 
+# Extract image_scores for histogram
+image_scores = [entry.get('image_score', 0) for entry in flattened_sorted_data]
+
+# Plot histogram of image_scores
+plt.figure(figsize=(10, 6))
+plt.hist(image_scores, bins=50, color='blue', edgecolor='black')
+plt.title('Histogram of Image Scores')
+plt.xlabel('Image Score')
+plt.ylabel('Frequency')
+output_image_path = '/root/image_score_histogram.png'
+plt.savefig(output_image_path)
+
 # 保存匹配后的json数据
-output_file = '/share/tengjianing/songyuhao/segmentation/datasets/0626/top%d_%d.json' % (s, t)
+output_file = '/share/tengjianing/songyuhao/segmentation/datasets/0626/top%d_%d___test.json' % (s, t)
 with open(output_file, 'w', encoding='utf-8') as outfile:
     json.dump(matched_data, outfile, ensure_ascii=False, indent=4)
 
